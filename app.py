@@ -1,4 +1,10 @@
 import streamlit as st
+from ai_care_agent import (
+    AgentConfigurationError,
+    AgentGuardrailError,
+    CareCoachAgent,
+    OpenAILLMClient,
+)
 from pawpal_system import CareTask, Pet, Owner, Planner
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
@@ -22,6 +28,9 @@ if "pet" not in st.session_state:
 
 if "planner" not in st.session_state:
     st.session_state.planner = Planner()
+
+if "care_agent" not in st.session_state:
+    st.session_state.care_agent = None
 
 st.divider()
 
@@ -170,3 +179,73 @@ if st.button("Generate schedule"):
 
     st.markdown("#### Plan Explanation")
     st.text(explanation)
+
+st.divider()
+st.subheader("AI Care Coach")
+
+if st.button("Ask AI Care Coach"):
+    try:
+        if st.session_state.care_agent is None:
+            st.session_state.care_agent = CareCoachAgent(
+                st.session_state.planner,
+                OpenAILLMClient(),
+            )
+
+        recommendation = st.session_state.care_agent.recommend(
+            st.session_state.owner,
+            st.session_state.pet,
+        )
+    except AgentConfigurationError as exc:
+        st.error(str(exc))
+    except AgentGuardrailError as exc:
+        st.error(str(exc))
+    else:
+        st.success(recommendation.summary)
+
+        st.markdown("#### Coach Explanation")
+        st.write(recommendation.llm_explanation)
+
+        st.markdown("#### Recommended Plan")
+        if recommendation.plan:
+            st.table([
+                {
+                    "Title": t.title,
+                    "Category": t.category,
+                    "Time": t.time or "—",
+                    "Duration": f"{t.duration_minutes} min",
+                    "Priority": t.priority,
+                }
+                for t in recommendation.plan
+            ])
+        else:
+            st.info("No tasks recommended right now.")
+
+        st.markdown("#### Skipped Tasks")
+        if recommendation.skipped:
+            st.table([
+                {
+                    "Title": t.title,
+                    "Category": t.category,
+                    "Time": t.time or "—",
+                    "Duration": f"{t.duration_minutes} min",
+                    "Priority": t.priority,
+                }
+                for t in recommendation.skipped
+            ])
+        else:
+            st.info("No tasks were skipped.")
+
+        if recommendation.warnings:
+            st.markdown("#### Remaining Warnings")
+            for warning in recommendation.warnings:
+                st.warning(warning)
+
+        st.markdown("#### Agent Audit Log")
+        st.table([
+            {
+                "Step": entry.step,
+                "Status": entry.status,
+                "Message": entry.message,
+            }
+            for entry in recommendation.log
+        ])

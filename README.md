@@ -12,11 +12,18 @@ This final project builds on the original PawPal+ system by keeping the scheduli
 
 The core logic lives in `pawpal_system.py`, while `app.py` provides the Streamlit interface. A separate `main.py` file demonstrates the same system from the command line, and the test suite verifies the planner's main behaviors.
 
+## AI Feature: LLM Agentic Care Coach
+
+PawPal+ includes an **LLM Agentic Care Coach**. The coach sends the current incomplete care tasks to an LLM, asks for a structured task order and short explanation, then validates that response before showing it to the user.
+
+The feature is agentic because it follows a plan-act-check-revise loop: it asks the LLM to plan, builds a budget-safe schedule from that plan, checks the result for conflicts, revises unsafe recommendations, and displays an audit log. Python guardrails reject invalid task data, malformed LLM JSON, unknown task titles, missing API configuration, and conflicting schedules that require revision.
+
 ## Features
 
 - **Owner and pet profiles**: Store the owner's name, daily time budget, and pet information.
 - **Task management**: Add care tasks with title, category, duration, priority, time, and recurrence frequency.
 - **Priority-based planning**: Selects the highest-priority tasks first while staying within the owner's available minutes.
+- **LLM Agentic Care Coach**: Uses an LLM to recommend task order, then validates, revises, and logs the result with local guardrails.
 - **Chronological sorting**: Displays scheduled tasks by `HH:MM` time, with unscheduled tasks moved to the end.
 - **Filtering**: Shows all, incomplete, or completed tasks, and supports filtering tasks by pet in the backend.
 - **Recurring tasks**: Automatically creates the next daily or weekly occurrence when a recurring task is marked complete.
@@ -27,6 +34,7 @@ The core logic lives in `pawpal_system.py`, while `app.py` provides the Streamli
 
 ```text
 .
+├── ai_care_agent.py    # LLM agent workflow, guardrails, and audit logging
 ├── app.py              # Streamlit user interface
 ├── main.py             # Command-line demo
 ├── pawpal_system.py    # Core classes and planner logic
@@ -54,6 +62,21 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+Create a local `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Then set your real key in `.env`:
+
+```text
+OPENAI_API_KEY=your-api-key-here
+OPENAI_MODEL=gpt-5
+```
+
+Do not commit `.env`. The repository's `.gitignore` is configured to keep local secret files out of Git.
+
 Run the Streamlit app:
 
 ```bash
@@ -80,10 +103,10 @@ Run tests with verbose output:
 python -m pytest -v
 ```
 
-The current test suite includes 20 automated tests covering sorting, recurring task generation, conflict detection, daily plan budget handling, task filtering, task editing, pet task aggregation, and recurring follow-up creation.
+The current test suite includes automated tests covering sorting, recurring task generation, conflict detection, daily plan budget handling, task filtering, task editing, pet task aggregation, recurring follow-up creation, LLM response validation, AI guardrails, and conflict revision.
 
 ## Confidence Level
 
 **Confidence: 5/5**
 
-The core scheduling logic is covered by automated tests, including happy paths and meaningful edge cases. The most important behaviors are verified: tasks are sorted correctly, recurring tasks generate the next occurrence, completed tasks are excluded from conflict checks, daily plans stay within the owner's time budget, and filters return the expected tasks.
+The core scheduling logic and AI agent workflow are covered by automated tests, including happy paths and meaningful edge cases. The most important behaviors are verified: tasks are sorted correctly, recurring tasks generate the next occurrence, completed tasks are excluded from conflict checks, daily plans stay within the owner's time budget, LLM outputs are validated before use, and unsafe AI recommendations are revised or rejected.
