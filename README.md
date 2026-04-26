@@ -13,7 +13,17 @@
 - **Filtering by status or pet** — View only incomplete tasks, completed tasks, or tasks belonging to a specific pet.
 - **Recurring tasks** — Tasks with a `daily` or `weekly` frequency automatically generate a new occurrence (with the correct next due date via `timedelta`) when marked complete.
 - **Conflict detection** — The planner scans for overlapping time slots and surfaces `st.warning` messages so the owner can resolve collisions before generating a plan.
+- **LLM Agentic Care Coach** — An optional AI coach asks an LLM to order incomplete tasks, then applies Python guardrails, budget checks, conflict checks, and revision before showing a final recommendation.
 - **Task management** — Add tasks with category, time, duration, priority, and frequency. Edit existing tasks or mark them complete directly from the UI.
+
+## AI Feature: LLM Agentic Care Coach
+
+The AI Care Coach combines an LLM ordering step with deterministic Python checks:
+
+- **LLM task order** — The coach sends the owner, available minutes, pet details, and exact incomplete task details to the LLM. The LLM must return JSON with a `task_order` list of exact task titles and an `explanation`.
+- **Plan-act-check-revise loop** — The agent orders tasks from the LLM response, appends any omitted real tasks, fits the result to the owner's time budget, checks schedule conflicts, and removes lower-priority conflicting tasks until conflicts are resolved where possible.
+- **Audit log** — Each recommendation includes a step-by-step log for guardrails, planning, action, conflict checking, and revision.
+- **Python guardrails** — The agent rejects invalid owner budgets, non-positive task durations, priorities outside `1..5`, invalid JSON, missing explanations, invalid task orders, and unknown LLM task titles before presenting a recommendation.
 
 ## Getting Started
 
@@ -25,10 +35,37 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+Create a local environment file for the OpenAI configuration:
+
+```bash
+cp .env.example .env
+```
+
+Then set these values in `.env`:
+
+```bash
+OPENAI_API_KEY=your-api-key-here
+OPENAI_MODEL=gpt-5
+```
+
+Do not commit `.env`; it is ignored because it may contain local secrets.
+
 ### Run the app
 
 ```bash
 streamlit run app.py
+```
+
+## Repository Structure
+
+```text
+.
+├── ai_care_agent.py      # LLM client, care coach agent, guardrails, and recommendation data classes
+├── app.py                # Streamlit UI
+├── main.py               # Project entry point
+├── pawpal_system.py      # Core pet care domain classes and planner
+├── requirements.txt      # Python dependencies
+└── tests/                # Automated tests
 ```
 
 ### Suggested workflow
