@@ -1,0 +1,54 @@
+classDiagram
+    direction TB
+
+    class CareTask {
+        +str title
+        +str category
+        +int duration_minutes
+        +int priority
+        +bool completed
+        +str time
+        +str frequency
+        +Optional~date~ due_date
+        +edit(title, duration_minutes, priority) None
+        +mark_complete() Optional~CareTask~
+        +compare_priority(other) int
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str notes
+        +list~CareTask~ tasks
+        +add_care_task(task) None
+        +list_tasks() list~CareTask~
+        +mark_task_complete(task) Optional~CareTask~
+    }
+
+    class Owner {
+        +str name
+        +int available_minutes_per_day
+        +dict preferences
+        +list~Pet~ pets
+        +update_profile(name, available_minutes, preferences) None
+        +add_pet(pet) None
+        +get_all_tasks() list~CareTask~
+    }
+
+    class Planner {
+        +str explanation
+        +build_daily_plan(owner, pet, tasks) list~CareTask~
+        +explain_plan(plan) str
+        +sort_by_time(tasks) list~CareTask~
+        +filter_by_status(tasks, completed) list~CareTask~
+        +filter_by_pet(owner, pet_name) list~CareTask~
+        +detect_conflicts(tasks) list~str~
+        -_fits_within_budget(tasks, minutes) bool
+        -_build_explanation(plan, skipped, used_minutes, budget) str
+    }
+
+    Owner "1" --> "0..*" Pet : owns
+    Pet "1" --> "0..*" CareTask : has
+    Planner ..> Owner : reads constraints from
+    Planner ..> Pet : associates plan with
+    Planner ..> CareTask : orders and selects
