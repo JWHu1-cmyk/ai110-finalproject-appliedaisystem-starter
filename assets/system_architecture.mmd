@@ -1,0 +1,27 @@
+flowchart LR
+    user["Pet Owner"] --> ui["Streamlit App<br/>app.py"]
+
+    ui --> input["Owner, Pet, and Task Inputs<br/>time budget, category, duration, priority, time"]
+    input --> planner["Rule-Based Planner<br/>pawpal_system.py"]
+    input --> agent["LLM Agentic Care Coach<br/>ai_care_agent.py"]
+
+    agent --> prompt["Prompt Builder<br/>exact incomplete task list"]
+    prompt --> llm["OpenAI LLM<br/>task_order JSON + explanation"]
+    llm --> guardrails["Response Guardrails<br/>JSON parsing, exact task titles, valid explanation"]
+    guardrails --> budget["Budget Fitter<br/>keeps tasks within available minutes"]
+    budget --> checker["Self-Check<br/>conflict detection via Planner"]
+    checker --> revise{"Conflicts found?"}
+    revise -- yes --> revision["Revise Plan<br/>remove lower-priority conflicting tasks"]
+    revision --> checker
+    revise -- no --> output["Final AI Recommendation<br/>plan, skipped tasks, explanation"]
+
+    planner --> classic["Classic Daily Plan<br/>priority-first schedule"]
+    output --> ui
+    classic --> ui
+
+    agent --> log["Agent Audit Log<br/>guardrails, plan, act, check, revise"]
+    log --> ui
+
+    tests["Reliability Tests<br/>pytest + fake LLM client"] --> agent
+    tests --> planner
+    human["Human Review<br/>reads recommendation, warnings, and audit log"] --> ui

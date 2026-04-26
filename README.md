@@ -18,6 +18,42 @@ PawPal+ includes an **LLM Agentic Care Coach**. The coach sends the current inco
 
 The feature is agentic because it follows a plan-act-check-revise loop: it asks the LLM to plan, builds a budget-safe schedule from that plan, checks the result for conflicts, revises unsafe recommendations, and displays an audit log. Python guardrails reject invalid task data, malformed LLM JSON, unknown task titles, missing API configuration, and conflicting schedules that require revision.
 
+## Architecture Overview
+
+The system architecture diagram is stored in `assets/system_architecture.mmd`. It shows the user entering owner, pet, and task information into the Streamlit app, which can send the same task data through two paths: the original rule-based `Planner` and the new LLM Agentic Care Coach.
+
+The AI path builds a prompt from incomplete tasks, asks the OpenAI LLM for a JSON task order and explanation, validates that response with Python guardrails, fits the ordered tasks into the owner's time budget, checks for conflicts, and revises the plan if needed. The final recommendation, skipped tasks, explanation, and audit log return to the Streamlit UI so the human user can review the AI's reasoning before acting on it.
+
+```mermaid
+flowchart LR
+    user["Pet Owner"] --> ui["Streamlit App<br/>app.py"]
+
+    ui --> input["Owner, Pet, and Task Inputs<br/>time budget, category, duration, priority, time"]
+    input --> planner["Rule-Based Planner<br/>pawpal_system.py"]
+    input --> agent["LLM Agentic Care Coach<br/>ai_care_agent.py"]
+
+    agent --> prompt["Prompt Builder<br/>exact incomplete task list"]
+    prompt --> llm["OpenAI LLM<br/>task_order JSON + explanation"]
+    llm --> guardrails["Response Guardrails<br/>JSON parsing, exact task titles, valid explanation"]
+    guardrails --> budget["Budget Fitter<br/>keeps tasks within available minutes"]
+    budget --> checker["Self-Check<br/>conflict detection via Planner"]
+    checker --> revise{"Conflicts found?"}
+    revise -- yes --> revision["Revise Plan<br/>remove lower-priority conflicting tasks"]
+    revision --> checker
+    revise -- no --> output["Final AI Recommendation<br/>plan, skipped tasks, explanation"]
+
+    planner --> classic["Classic Daily Plan<br/>priority-first schedule"]
+    output --> ui
+    classic --> ui
+
+    agent --> log["Agent Audit Log<br/>guardrails, plan, act, check, revise"]
+    log --> ui
+
+    tests["Reliability Tests<br/>pytest + fake LLM client"] --> agent
+    tests --> planner
+    human["Human Review<br/>reads recommendation, warnings, and audit log"] --> ui
+```
+
 ## Features
 
 - **Owner and pet profiles**: Store the owner's name, daily time budget, and pet information.
@@ -89,7 +125,15 @@ You can also run the command-line demo:
 python main.py
 ```
 
-## Testing
+## Design Decisions
+
+The LLM is used for the part where natural-language reasoning is helpful: recommending an order for the day's care tasks and explaining that recommendation in a user-friendly way. The app does not let the LLM directly create or mutate tasks, because scheduling needs predictable safety checks.
+
+Python keeps responsibility for guardrails, budget limits, conflict detection, and final validation. This design trades some LLM flexibility for reliability: the model can suggest priorities, but the code decides whether the suggestion is valid, affordable within the time budget, and safe to show.
+
+The agent also uses structured JSON instead of free-form text. That makes the LLM output easier to test, easier to reject when malformed, and easier to map back to real `CareTask` objects.
+
+## Reliability and Evaluation
 
 Run the full test suite:
 
@@ -103,7 +147,23 @@ Run tests with verbose output:
 python -m pytest -v
 ```
 
-The current test suite includes automated tests covering sorting, recurring task generation, conflict detection, daily plan budget handling, task filtering, task editing, pet task aggregation, recurring follow-up creation, LLM response validation, AI guardrails, and conflict revision.
+The current test suite has **35 automated tests**, and the latest local verification passed with **35/35 tests passing**. These tests cover sorting, recurring task generation, conflict detection, daily plan budget handling, task filtering, task editing, pet task aggregation, recurring follow-up creation, LLM response validation, AI guardrails, and conflict revision.
+
+The AI tests use a fake LLM client so reliability can be checked without spending API credits or depending on a live model response. The tests verify that the agent accepts valid JSON, rejects malformed JSON, rejects unknown task titles, refuses invalid task data, avoids calling the LLM when no incomplete tasks exist, and revises conflicting schedules by removing lower-priority conflicting tasks.
+
+The app also includes runtime reliability features: clear error handling for missing API keys, guardrail errors for unsafe inputs, and an audit log that records the agent's guardrails, planning, action, checking, and revision steps.
+
+## Testing Summary
+
+The most important result was that adding validation made the AI workflow more trustworthy. Without guardrails, an LLM could invent a task title or return an unusable response; with validation, those cases are rejected before they reach the schedule.
+
+What worked well: fake LLM tests made the AI behavior reproducible, and the planner's existing conflict detection was reusable inside the agent's self-check loop. The main limitation is that live LLM quality can still vary, so the system treats the LLM as a recommender rather than the final authority.
+
+## Reflection
+
+This project taught me that adding AI is most useful when the AI has a clear job and the surrounding system has strong boundaries. The LLM is good at making a helpful recommendation and explanation, but the Python code is better at enforcing rules, checking conflicts, and keeping the final result safe.
+
+The biggest design lesson was that an agentic system is more than a model call. The useful behavior comes from the loop around the model: plan, act, check, revise, log, and let a human review the result.
 
 ## Confidence Level
 
