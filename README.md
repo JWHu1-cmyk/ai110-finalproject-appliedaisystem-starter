@@ -1,73 +1,89 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ Final Project
 
-**PawPal+** is a Streamlit-powered pet care planner that helps busy owners stay on top of walks, feedings, grooming, and more. It builds a priority-based daily schedule that fits within a configurable time budget, flags scheduling conflicts, and automatically handles recurring tasks.
+**PawPal+** is a Streamlit-powered pet care planner that helps pet owners organize daily care tasks, detect schedule conflicts, and generate a priority-based daily plan that fits within the owner's available time.
 
-## Demo
+## Original Project Summary
 
-[![PawPal+ app screenshot](demo.png)](demo.png)
+My original project from Modules 1-3 was **PawPal+**, a pet care scheduling assistant for busy owners. Its original goal was to model owners, pets, and care tasks using object-oriented design, then use that model to create a clear daily plan based on task priority, duration, scheduled time, and the owner's available minutes. By the end of the original project, PawPal+ could add and edit pet care tasks, sort them chronologically, filter by completion status or pet, detect overlapping time slots, create recurring daily or weekly follow-up tasks, and explain why certain tasks were scheduled or skipped.
+
+## Final Project Overview
+
+This final project builds on the original PawPal+ system by keeping the scheduling logic separated from the user interface and presenting the planner through an interactive Streamlit app. The app lets a user manage owner and pet information, add care tasks, review filtered and sorted task lists, identify conflicts, mark tasks complete, and generate a daily schedule with a human-readable explanation.
+
+The core logic lives in `pawpal_system.py`, while `app.py` provides the Streamlit interface. A separate `main.py` file demonstrates the same system from the command line, and the test suite verifies the planner's main behaviors.
 
 ## Features
 
-- **Priority-based daily planning** — The Planner greedily selects tasks by priority (highest first) until the owner's available minutes are exhausted, then explains what was scheduled and what was skipped.
-- **Sorting by time** — Tasks are sorted by their scheduled `HH:MM` time so the daily plan reads in chronological order. Tasks without a time slot sort to the end.
-- **Filtering by status or pet** — View only incomplete tasks, completed tasks, or tasks belonging to a specific pet.
-- **Recurring tasks** — Tasks with a `daily` or `weekly` frequency automatically generate a new occurrence (with the correct next due date via `timedelta`) when marked complete.
-- **Conflict detection** — The planner scans for overlapping time slots and surfaces `st.warning` messages so the owner can resolve collisions before generating a plan.
-- **Task management** — Add tasks with category, time, duration, priority, and frequency. Edit existing tasks or mark them complete directly from the UI.
+- **Owner and pet profiles**: Store the owner's name, daily time budget, and pet information.
+- **Task management**: Add care tasks with title, category, duration, priority, time, and recurrence frequency.
+- **Priority-based planning**: Selects the highest-priority tasks first while staying within the owner's available minutes.
+- **Chronological sorting**: Displays scheduled tasks by `HH:MM` time, with unscheduled tasks moved to the end.
+- **Filtering**: Shows all, incomplete, or completed tasks, and supports filtering tasks by pet in the backend.
+- **Recurring tasks**: Automatically creates the next daily or weekly occurrence when a recurring task is marked complete.
+- **Conflict detection**: Flags overlapping scheduled tasks before the user generates a final daily plan.
+- **Plan explanation**: Explains how many minutes were used, which tasks were scheduled, and which tasks were skipped because of the time budget.
+
+## Repository Structure
+
+```text
+.
+├── app.py              # Streamlit user interface
+├── main.py             # Command-line demo
+├── pawpal_system.py    # Core classes and planner logic
+├── tests/              # Automated tests
+├── demo.png            # App screenshot
+├── reflection.md       # Project reflection
+├── pawpal_uml.mmd      # UML source
+├── pawpal_uml.svg      # UML diagram
+├── uml_final.png       # Final UML image
+└── requirements.txt    # Python dependencies
+```
 
 ## Getting Started
 
-### Setup
+Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-### Run the app
+Run the Streamlit app:
 
 ```bash
 streamlit run app.py
 ```
 
-### Suggested workflow
+You can also run the command-line demo:
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+```bash
+python main.py
+```
 
-## Testing PawPal+
+## Testing
 
-Run the full test suite with:
+Run the full test suite:
 
 ```bash
 python -m pytest
 ```
 
-For verbose output showing each test name and result:
+Run tests with verbose output:
 
 ```bash
 python -m pytest -v
 ```
 
-### What the tests cover
+The current test suite includes 20 automated tests covering sorting, recurring task generation, conflict detection, daily plan budget handling, task filtering, task editing, pet task aggregation, and recurring follow-up creation.
 
-The suite contains **20 automated tests** spanning happy paths and edge cases:
-
-- **Sorting correctness** — Tasks are returned in chronological order by scheduled time; tasks with no time sort to the end.
-- **Recurrence logic** — Marking a daily task complete creates a new task for the next day; weekly tasks advance by 7 days; one-time tasks do not recur.
-- **Conflict detection** — Overlapping and identical-time tasks produce warnings; non-overlapping tasks produce none; completed tasks are excluded from conflict checks.
-- **Daily plan budget** — The planner selects highest-priority tasks first and never exceeds the owner's available minutes. An empty task list is handled gracefully.
-- **Filtering** — `filter_by_status` correctly separates complete/incomplete tasks; `filter_by_pet` returns only the named pet's tasks and returns an empty list for unknown names.
-- **Task editing and aggregation** — `CareTask.edit` updates only specified fields; `Owner.get_all_tasks` aggregates tasks across all pets; `Pet.mark_task_complete` auto-adds recurring follow-ups.
-
-### Confidence Level
+## Confidence Level
 
 **Confidence: 5/5**
 
-All 20 tests pass and cover the core scheduling logic, recurring task generation, conflict detection, filtering, and budget constraints. Both happy paths and meaningful edge cases (empty inputs, unknown pets, completed-task exclusion) are validated.
+The core scheduling logic is covered by automated tests, including happy paths and meaningful edge cases. The most important behaviors are verified: tasks are sorted correctly, recurring tasks generate the next occurrence, completed tasks are excluded from conflict checks, daily plans stay within the owner's time budget, and filters return the expected tasks.
