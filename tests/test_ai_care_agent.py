@@ -105,13 +105,22 @@ def test_priority_outside_one_to_five_rejected():
         CareCoachAgent(Planner(), FakeLLM("{}")).recommend(owner, pet)
 
 
-def test_invalid_json_rejected():
+def test_natural_language_llm_response_uses_priority_fallback_order():
     owner, pet = make_owner_pet(
-        CareTask(title="Morning walk", category="Exercise", duration_minutes=30, priority=5)
+        CareTask(title="Morning walk", category="Exercise", duration_minutes=30, priority=5),
+        CareTask(title="Brush coat", category="Grooming", duration_minutes=30, priority=2),
+        minutes=30,
     )
 
-    with pytest.raises(AgentGuardrailError, match="valid JSON"):
-        CareCoachAgent(Planner(), FakeLLM("not-json")).recommend(owner, pet)
+    recommendation = CareCoachAgent(
+        Planner(),
+        FakeLLM("Start with Morning walk because it has the highest priority."),
+    ).recommend(owner, pet)
+
+    assert [task.title for task in recommendation.plan] == ["Morning walk"]
+    assert [task.title for task in recommendation.skipped] == ["Brush coat"]
+    assert "Start with Morning walk" in recommendation.llm_explanation
+    assert recommendation.log[1].status == "ok"
 
 
 @pytest.mark.parametrize(
@@ -122,13 +131,14 @@ def test_invalid_json_rejected():
         '{"task_order": [123], "explanation": "Wrong item type."}',
     ],
 )
-def test_missing_or_invalid_task_order_rejected(response):
+def test_missing_or_invalid_task_order_uses_priority_fallback(response):
     owner, pet = make_owner_pet(
         CareTask(title="Morning walk", category="Exercise", duration_minutes=30, priority=5)
     )
 
-    with pytest.raises(AgentGuardrailError, match="task_order"):
-        CareCoachAgent(Planner(), FakeLLM(response)).recommend(owner, pet)
+    recommendation = CareCoachAgent(Planner(), FakeLLM(response)).recommend(owner, pet)
+
+    assert [task.title for task in recommendation.plan] == ["Morning walk"]
 
 
 @pytest.mark.parametrize(
@@ -138,13 +148,15 @@ def test_missing_or_invalid_task_order_rejected(response):
         '{"task_order": ["Morning walk"], "explanation": "   "}',
     ],
 )
-def test_blank_or_missing_explanation_rejected(response):
+def test_blank_or_missing_explanation_uses_safe_fallback(response):
     owner, pet = make_owner_pet(
         CareTask(title="Morning walk", category="Exercise", duration_minutes=30, priority=5)
     )
 
-    with pytest.raises(AgentGuardrailError, match="explanation"):
-        CareCoachAgent(Planner(), FakeLLM(response)).recommend(owner, pet)
+    recommendation = CareCoachAgent(Planner(), FakeLLM(response)).recommend(owner, pet)
+
+    assert [task.title for task in recommendation.plan] == ["Morning walk"]
+    assert recommendation.llm_explanation
 
 
 def test_empty_incomplete_task_list_returns_clear_recommendation_without_calling_llm():

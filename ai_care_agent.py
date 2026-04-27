@@ -88,7 +88,16 @@ class CareCoachAgent:
         prompt = self._build_prompt(owner, pet, incomplete_tasks)
         llm_text = self.llm_client.complete(prompt)
         task_order, explanation = self._parse_llm_response(llm_text, incomplete_tasks)
-        log.append(AgentLogEntry("plan", "LLM returned a task order and explanation.", "ok"))
+        if task_order:
+            log.append(AgentLogEntry("plan", "LLM returned a task order and explanation.", "ok"))
+        else:
+            log.append(
+                AgentLogEntry(
+                    "plan",
+                    "LLM returned a natural-language explanation; using priority fallback order.",
+                    "warning",
+                )
+            )
 
         ordered_tasks = self._ordered_tasks(task_order, incomplete_tasks)
         plan, skipped = self._fit_to_budget(ordered_tasks, owner.available_minutes_per_day)
@@ -136,8 +145,9 @@ class CareCoachAgent:
     def _build_prompt(self, owner: Owner, pet: Pet, tasks: list[CareTask]) -> str:
         lines = [
             "You are an AI pet care coach helping order today's incomplete tasks.",
-            "Return only JSON with this shape: {\"task_order\": [\"exact task title\"], \"explanation\": \"brief reason\"}.",
-            "Use only exact task titles from the task list. Do not invent or rename tasks.",
+            "Recommend a practical care order and briefly explain your reasoning.",
+            "If you return JSON, use this shape: {\"task_order\": [\"exact task title\"], \"explanation\": \"brief reason\"}.",
+            "If you write normal text, use only the provided task names and do not invent or rename tasks.",
             f"Owner: {owner.name}",
             f"Available minutes: {owner.available_minutes_per_day}",
             f"Pet: {pet.name} ({pet.species})",
@@ -153,18 +163,27 @@ class CareCoachAgent:
         return "\n".join(lines)
 
     def _parse_llm_response(self, llm_text: str, tasks: list[CareTask]) -> tuple[list[str], str]:
+        fallback_order = sorted(tasks, key=lambda task: task.priority, reverse=True)
+        fallback_titles = [task.title for task in fallback_order]
+        fallback_explanation = llm_text.strip()
+        if not fallback_explanation:
+            fallback_explanation = (
+                "The LLM did not return an explanation, so PawPal+ used the "
+                "highest-priority incomplete tasks first."
+            )
+
         try:
             payload = json.loads(llm_text)
-        except json.JSONDecodeError as exc:
-            raise AgentGuardrailError("LLM response must be valid JSON.") from exc
+        except json.JSONDecodeError:
+            return fallback_titles, fallback_explanation
 
         task_order = payload.get("task_order")
         if not isinstance(task_order, list) or not all(isinstance(title, str) for title in task_order):
-            raise AgentGuardrailError("LLM response must include task_order as a list of task titles.")
+            return fallback_titles, payload.get("explanation") or fallback_explanation
 
         explanation = payload.get("explanation")
         if not isinstance(explanation, str) or not explanation.strip():
-            raise AgentGuardrailError("LLM response must include a non-blank explanation.")
+            explanation = fallback_explanation
 
         known_titles = {task.title for task in tasks}
         unknown_titles = [title for title in task_order if title not in known_titles]
